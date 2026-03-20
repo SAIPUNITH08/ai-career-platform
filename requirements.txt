@@ -1,0 +1,10 @@
+streamlit
+openai
+pymupdf
+requests
+beautifulsoup4
+plotly
+pandas
+python-dotenv
+google-generativeai
+google-genai
