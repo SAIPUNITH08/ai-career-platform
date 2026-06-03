@@ -1,12 +1,10 @@
 import streamlit as st
 
-
 st.set_page_config(
     page_title="AI Career Intelligence Platform",
     page_icon="💼",
     layout="wide",
 )
-
 
 PAGES = {
     "home": {
@@ -110,6 +108,7 @@ def render_sidebar(active_page):
                 text-decoration: none !important;
                 border: 1px solid transparent;
                 transition: background 150ms ease, color 150ms ease, border 150ms ease;
+                cursor: pointer;
             }
 
             .nav-item:hover {
@@ -156,6 +155,61 @@ def render_sidebar(active_page):
                 font-size: 0.78rem;
             }
         </style>
+
+        <!-- Auto-close sidebar on mobile when nav item clicked -->
+        <script>
+        (function() {
+            function closeSidebarOnMobile() {
+                // Only on mobile/narrow screens
+                if (window.innerWidth > 768) return;
+
+                const sidebar = window.parent.document.querySelector('[data-testid="stSidebar"]');
+                const collapseBtn = window.parent.document.querySelector('[data-testid="collapsedControl"]');
+                const expandBtn = window.parent.document.querySelector('[data-testid="baseButton-headerNoPadding"]');
+
+                if (!sidebar) return;
+
+                // Find the close/collapse button Streamlit renders
+                const closeBtn = window.parent.document.querySelector(
+                    'button[kind="header"][data-testid="baseButton-headerNoPadding"],' +
+                    '[data-testid="stSidebarCollapseButton"] button,' +
+                    'section[data-testid="stSidebar"] button'
+                );
+
+                if (closeBtn) {
+                    closeBtn.click();
+                }
+            }
+
+            // Wait for the page to fully load, then attach listener
+            function attachNavListeners() {
+                const navLinks = window.parent.document.querySelectorAll('.nav-item');
+                navLinks.forEach(function(link) {
+                    link.addEventListener('click', function() {
+                        setTimeout(closeSidebarOnMobile, 100);
+                    });
+                });
+            }
+
+            // MutationObserver to re-attach when Streamlit re-renders
+            function observeAndAttach() {
+                const observer = new MutationObserver(function() {
+                    attachNavListeners();
+                });
+                const target = window.parent.document.querySelector('[data-testid="stSidebar"]');
+                if (target) {
+                    observer.observe(target, { childList: true, subtree: true });
+                }
+                attachNavListeners();
+            }
+
+            if (document.readyState === 'complete') {
+                observeAndAttach();
+            } else {
+                window.addEventListener('load', observeAndAttach);
+            }
+        })();
+        </script>
         """,
         unsafe_allow_html=True,
     )
@@ -163,8 +217,9 @@ def render_sidebar(active_page):
     nav_links = []
     for slug, item in PAGES.items():
         active_class = " active" if slug == active_page else ""
+        # onclick triggers sidebar close on mobile via JS + navigates
         nav_links.append(
-            f"""<a class="nav-item{active_class}" href="?page={slug}" target="_self">
+            f"""<a class="nav-item{active_class}" href="?page={slug}" target="_self" onclick="if(window.innerWidth<=768){{setTimeout(function(){{var btns=window.parent.document.querySelectorAll('section[data-testid=\\'stSidebar\\'] button');if(btns.length)btns[0].click();}},80)}}">
 <span class="nav-icon">{item["icon"]}</span>
 <span class="nav-text">
 <span class="nav-label">{item["label"]}</span>
@@ -214,20 +269,16 @@ if page == "home":
 
 elif page == "resume":
     from resume_analyzer import show_resume_analyzer
-
     show_resume_analyzer()
 
 elif page == "jobs":
     from job_scraper import show_job_scraper
-
     show_job_scraper()
 
 elif page == "email":
     from email_generator import show_email_generator
-
     show_email_generator()
 
 elif page == "dashboard":
     from dashboard import show_dashboard
-
     show_dashboard()
