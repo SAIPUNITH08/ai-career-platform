@@ -8,56 +8,59 @@ from dotenv import load_dotenv
 
 load_dotenv()
 groq_client = Groq(api_key=os.getenv("GROQ_API_KEY"))
-JSEARCH_API_KEY = os.getenv("JSEARCH_API_KEY")  # RapidAPI key
+ADZUNA_APP_ID  = os.getenv("ADZUNA_APP_ID")   # from developer.adzuna.com
+ADZUNA_APP_KEY = os.getenv("ADZUNA_APP_KEY")  # from developer.adzuna.com
 
 
-def get_jsearch_jobs(job_title, location="India"):
+def get_adzuna_jobs(job_title, location=""):
     jobs = []
     try:
-        query = f"{job_title} in {location}" if location else f"{job_title} in India"
-        url = "https://jsearch.p.rapidapi.com/search"
-        headers = {
-            "X-RapidAPI-Key": JSEARCH_API_KEY,
-            "X-RapidAPI-Host": "jsearch.p.rapidapi.com"
-        }
+        # Adzuna India country code is "in"
+        url = f"https://api.adzuna.com/v1/api/jobs/in/search/1"
         params = {
-            "query": query,
-            "page": "1",
-            "num_pages": "1",
-            "country": "in",
-            "date_posted": "month"
+            "app_id": ADZUNA_APP_ID,
+            "app_key": ADZUNA_APP_KEY,
+            "results_per_page": 10,
+            "what": job_title,
+            "content-type": "application/json"
         }
-        response = requests.get(url, headers=headers, params=params, timeout=10)
+        if location:
+            params["where"] = location
+
+        response = requests.get(url, params=params, timeout=10)
 
         if response.status_code == 200:
             data = response.json()
-            for job in data.get("data", []):
+            for job in data.get("results", []):
                 # Salary
-                min_sal = job.get("job_min_salary")
-                max_sal = job.get("job_max_salary")
-                sal_currency = job.get("job_salary_currency", "INR")
-                sal_period = job.get("job_salary_period", "")
-                if min_sal and max_sal:
-                    salary = f"{sal_currency} {int(min_sal):,} - {int(max_sal):,} / {sal_period}"
+                sal_min = job.get("salary_min")
+                sal_max = job.get("salary_max")
+                if sal_min and sal_max:
+                    salary = f"₹{int(sal_min):,} - ₹{int(sal_max):,}"
+                elif sal_min:
+                    salary = f"₹{int(sal_min):,}+"
                 else:
                     salary = "Not disclosed"
 
+                # Location
+                loc_parts = job.get("location", {}).get("display_name", "India")
+
                 jobs.append({
-                    "Job Title": job.get("job_title", "N/A"),
-                    "Company": job.get("employer_name", "N/A"),
-                    "Location": f"{job.get('job_city', '')} {job.get('job_state', '')}".strip() or job.get("job_country", "India"),
+                    "Job Title": job.get("title", "N/A"),
+                    "Company": job.get("company", {}).get("display_name", "N/A"),
+                    "Location": loc_parts,
                     "Salary": salary,
-                    "Employment Type": job.get("job_employment_type", "N/A"),
-                    "Experience": job.get("job_required_experience", {}).get("required_experience_in_months", "N/A"),
-                    "Description": (job.get("job_description", "N/A") or "")[:300] + "...",
-                    "Link": job.get("job_apply_link", "#"),
-                    "Posted": (job.get("job_posted_at_datetime_utc") or "N/A")[:10],
-                    "Source": f"{job.get('job_publisher', 'JSearch')} ✅"
+                    "Employment Type": job.get("contract_time", "N/A").replace("_", " ").title(),
+                    "Category": job.get("category", {}).get("label", "N/A"),
+                    "Description": (job.get("description", "") or "")[:300] + "...",
+                    "Link": job.get("redirect_url", "#"),
+                    "Posted": (job.get("created", "N/A") or "N/A")[:10],
+                    "Source": "Adzuna India ✅"
                 })
         else:
-            st.error(f"JSearch API error: {response.status_code} — {response.text}")
+            st.error(f"Adzuna API error: {response.status_code} — {response.text}")
     except Exception as e:
-        st.error(f"JSearch error: {e}")
+        st.error(f"Adzuna error: {e}")
     return jobs
 
 
@@ -72,7 +75,7 @@ def get_ai_jobs_fallback(job_title, location, num_jobs=8):
         "Location": "Bengaluru, Karnataka",
         "Salary": "₹8,00,000 - ₹15,00,000 per year",
         "Employment Type": "Full-time",
-        "Experience": "3-5 years",
+        "Category": "IT Jobs",
         "Description": "We are looking for a skilled React developer...",
         "Link": "https://www.naukri.com",
         "Posted": "2025-06-01",
@@ -122,7 +125,7 @@ def get_market_insights(jobs, job_title):
 
 def show_job_scraper():
     st.title("🔍 Live Job Finder")
-    st.markdown("Real jobs from **Google for Jobs / LinkedIn / Indeed (India)** + AI-powered market insights!")
+    st.markdown("Real jobs from **Adzuna India** + AI-powered market insights!")
 
     col1, col2, col3 = st.columns(3)
     with col1:
@@ -131,7 +134,7 @@ def show_job_scraper():
         location = st.text_input("Location", placeholder="e.g. Bengaluru, Mumbai, Delhi")
     with col3:
         source = st.selectbox("Source", [
-            "🌐 JSearch (Real Indian Jobs)",
+            "🌐 Adzuna (Real Indian Jobs)",
             "🤖 AI Generated"
         ])
 
@@ -143,11 +146,11 @@ def show_job_scraper():
         all_jobs = []
 
         with st.spinner("🔍 Fetching live jobs from India..."):
-            if source == "🌐 JSearch (Real Indian Jobs)":
-                if not JSEARCH_API_KEY:
-                    st.error("❌ JSEARCH_API_KEY not found in .env file! Get it free at rapidapi.com/jsearch")
+            if source == "🌐 Adzuna (Real Indian Jobs)":
+                if not ADZUNA_APP_ID or not ADZUNA_APP_KEY:
+                    st.error("❌ ADZUNA_APP_ID or ADZUNA_APP_KEY not found! Register free at developer.adzuna.com")
                     return
-                all_jobs = get_jsearch_jobs(job_title, location)
+                all_jobs = get_adzuna_jobs(job_title, location)
                 if not all_jobs:
                     st.warning("No live jobs found. Switching to AI mode...")
                     all_jobs = get_ai_jobs_fallback(job_title, location)
@@ -166,6 +169,7 @@ def show_job_scraper():
                     with col1:
                         st.write(f"**💰 Salary:** {job.get('Salary', 'Not disclosed')}")
                         st.write(f"**💼 Type:** {job.get('Employment Type', 'N/A')}")
+                        st.write(f"**🏷️ Category:** {job.get('Category', 'N/A')}")
                         st.write(f"**📅 Posted:** {job.get('Posted', 'N/A')}")
                     with col2:
                         link = job.get('Link', '#')
