@@ -1,3 +1,8 @@
+try:
+    from db import log_skill_analyzed
+except Exception:
+    def log_skill_analyzed(*a, **kw): pass
+
 import streamlit as st
 import plotly.graph_objects as go
 import plotly.express as px
@@ -264,6 +269,8 @@ def show_dashboard():
                     roadmap = line.split("ROADMAP:")[1].strip()
 
             st.success("✅ Skills Analysis Complete!")
+            _mv = int(match) if match.isdigit() else 50
+            log_skill_analyzed(your_role, _mv)
             st.markdown("---")
 
             col1, col2, col3 = st.columns(3)

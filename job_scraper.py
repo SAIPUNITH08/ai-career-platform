@@ -1,3 +1,8 @@
+try:
+    from db import log_job_search
+except Exception:
+    def log_job_search(*a, **kw): pass
+
 import streamlit as st
 import requests
 import pandas as pd
@@ -159,6 +164,7 @@ def show_job_scraper():
 
         if all_jobs:
             st.success(f"🎉 Found {len(all_jobs)} jobs!")
+            log_job_search(job_title, location, len(all_jobs))
             st.markdown("---")
 
             for job in all_jobs:

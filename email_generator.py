@@ -1,3 +1,8 @@
+try:
+    from db import log_email_generated
+except Exception:
+    def log_email_generated(*a, **kw): pass
+
 import streamlit as st
 from groq import Groq
 import os
@@ -180,6 +185,7 @@ def show_email_generator():
                     emails.append(email)
 
             st.success(f"✅ {versions} email(s) generated!")
+            log_email_generated(email_type, company)
 
             for i, email in enumerate(emails):
                 if versions > 1:

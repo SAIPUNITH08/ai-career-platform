@@ -12,6 +12,11 @@ from reportlab.lib import colors
 from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, HRFlowable
 from reportlab.lib.enums import TA_CENTER
 
+try:
+    from db import log_resume_score
+except Exception:
+    def log_resume_score(*a, **kw): pass
+
 load_dotenv()
 
 api_key = os.getenv("GROQ_API_KEY")
@@ -329,6 +334,10 @@ def show_resume_analyzer():
                 st.session_state.pop("new_analysis", None)
                 result = analyze_resume(resume_text, job_description)
                 st.session_state["analysis_result"] = result
+                # Log to Supabase
+                _score = extract_ats_score(result)
+                if _score:
+                    log_resume_score(_score, job_description[:60])
 
     # ── Original analysis display ────────────────────────────────────────────
     if "analysis_result" in st.session_state and "improved_resume" not in st.session_state:
@@ -396,6 +405,10 @@ def show_resume_analyzer():
                     st.session_state["analysis_result"]
                 )
                 st.session_state["new_analysis"] = new_analysis
+                _new = extract_ats_score(new_analysis)
+                _old = extract_ats_score(st.session_state.get("analysis_result",""))
+                if _new and _old:
+                    log_resume_score(_new, st.session_state.get("job_description","")[:60], improved_score=_new)
 
         if "new_analysis" in st.session_state:
             new_text   = st.session_state["new_analysis"]
